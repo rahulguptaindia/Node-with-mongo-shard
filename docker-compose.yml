@@ -1,0 +1,135 @@
+version: '3.8'
+
+services:
+  config-svr-1:
+    image: mongo:4.4
+    command: mongod --configsvr --replSet config-svr-replica-set --bind_ip_all --port 27017
+    ports:
+      - "27101:27017"
+    volumes:
+      - configsvr1_data:/data/db
+    networks:
+      - mongo-shard-cluster
+
+  config-svr-2:
+    image: mongo:4.4
+    command: mongod --configsvr --replSet config-svr-replica-set --bind_ip_all --port 27017
+    ports:
+      - "27102:27017"
+    volumes:
+      - configsvr2_data:/data/db
+    networks:
+      - mongo-shard-cluster
+
+  config-svr-3:
+    image: mongo:4.4
+    command: mongod --configsvr --replSet config-svr-replica-set --bind_ip_all --port 27017
+    ports:
+      - "27103:27017"
+    volumes:
+      - configsvr3_data:/data/db
+    networks:
+      - mongo-shard-cluster
+
+  shard-X-node-a:
+    image: mongo:4.4
+    command: mongod --shardsvr --replSet shard-X-replica-set --bind_ip_all --port 27017
+    ports:
+      - "27111:27017"
+    volumes:
+      - shard1nodea_data:/data/db
+    networks:
+      - mongo-shard-cluster
+
+  shard-X-node-b:
+    image: mongo:4.4
+    command: mongod --shardsvr --replSet shard-X-replica-set --bind_ip_all --port 27017
+    ports:
+      - "27121:27017"
+    volumes:
+      - shard1nodeb_data:/data/db
+    networks:
+      - mongo-shard-cluster
+
+  shard-X-node-c:
+    image: mongo:4.4
+    command: mongod --shardsvr --replSet shard-X-replica-set --bind_ip_all --port 27017
+    ports:
+      - "27131:27017"
+    volumes:
+      - shard1nodec_data:/data/db
+    networks:
+      - mongo-shard-cluster
+
+  router-1:
+    image: mongo:4.4
+    command: mongos --configdb config-svr-replica-set/config-svr-1:27017,config-svr-2:27017,config-svr-3:27017 --bind_ip_all --port 27017
+    ports:
+      - "27141:27017"
+    depends_on:
+      - config-svr-1
+      - config-svr-2
+      - config-svr-3
+      - shard-X-node-a
+      - shard-X-node-b
+      - shard-X-node-c
+    networks:
+      - mongo-shard-cluster
+
+  router-2:
+    image: mongo:4.4
+    command: mongos --configdb config-svr-replica-set/config-svr-1:27017,config-svr-2:27017,config-svr-3:27017 --bind_ip_all --port 27017
+    ports:
+      - "27142:27017"
+    depends_on:
+      - config-svr-1
+      - config-svr-2
+      - config-svr-3
+      - shard-X-node-a
+      - shard-X-node-b
+      - shard-X-node-c
+    networks:
+      - mongo-shard-cluster
+
+  frontend:
+    build:
+      context: ./frontend
+    networks:
+      - mongo-shard-cluster
+
+  backend:
+    build:
+      context: ./backend
+    networks:
+      - mongo-shard-cluster
+
+  nginx:
+    image: nginx
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+    ports:
+      - "80:80"
+    networks:
+      - mongo-shard-cluster
+
+  adminmongo:
+    image: "mrvautin/adminmongo"
+    ports:
+      - "1234:1234"
+    environment:
+      - HOST=0.0.0.0
+    networks:
+      - mongo-shard-cluster
+
+networks:
+  mongo-shard-cluster:
+    driver: bridge
+
+volumes:
+  configsvr1_data:
+  configsvr2_data:
+  configsvr3_data:
+  shard1nodea_data:
+  shard1nodeb_data:
+  shard1nodec_data:
+
